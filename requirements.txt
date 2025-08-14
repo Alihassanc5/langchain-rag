@@ -1,0 +1,14 @@
+streamlit
+langchain
+langchain-community
+langchain-google-genai
+langchain-text-splitters
+langchain-core
+langgraph
+chromadb
+google-generativeai
+python-dotenv
+unstructured
+python-docx
+typing-extensions
+langchain-chroma
