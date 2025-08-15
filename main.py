@@ -87,7 +87,7 @@ class RAGApp:
         """Initialize the RAG prompt."""
         # self.prompt = hub.pull("rlm/rag-prompt")
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a helpful assistant that answers questions using related to cogent lab policies. Don't tell the user about techincal terms or jargon."),
+            ("system", "You are a helpful assistant that answers questions using related to cogent labs policies. Don't tell the user about techincal terms or jargon."),
             ("human", "Context:\n{context}\n\nConversation History:\n{conversation_history}\n\nQuestion: {question}")
         ])
     
@@ -270,7 +270,7 @@ def authenticate_user():
 def main():
     # Page configuration
     st.set_page_config(
-        page_title="RAG Chat Assistant",
+        page_title="Cogent Labs Policies Assistant",
         page_icon="🤖",
         layout="wide"
     )
@@ -286,8 +286,8 @@ def main():
     init_authentication()
 
     # Title and description
-    st.title("Cogent Lab Policies Assistant")
-    st.markdown("Ask questions about the Cogent Lab policies.")
+    st.title("Cogent Labs Policies Assistant")
+    st.markdown("Ask questions about the Cogent Labs policies.")
 
     # Sidebar for document management with authentication
     with st.sidebar:
@@ -430,7 +430,7 @@ def main():
             st.markdown(message["content"])
 
     # Chat input
-    if prompt := st.chat_input("Ask anything about the Cogent Lab policies..."):
+    if prompt := st.chat_input("Ask anything about the Cogent Labs policies..."):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         
