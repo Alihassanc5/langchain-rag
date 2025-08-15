@@ -234,8 +234,7 @@ def init_authentication():
     """Initialize authentication settings."""
     # Set default admin credentials if not already set
     if "admin_password_hash" not in st.session_state:
-        # Default password: "admin123" - change this in production!
-        default_password = "admin123"
+        default_password = os.getenv("ADMIN_PASSWORD")
         st.session_state.admin_password_hash = hash_password(default_password)
     
     # Initialize authentication state
