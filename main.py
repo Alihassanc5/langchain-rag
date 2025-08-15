@@ -272,7 +272,8 @@ def main():
     st.set_page_config(
         page_title="Cogent Labs Policies Assistant",
         page_icon="🤖",
-        layout="wide"
+        layout="wide",
+        initial_sidebar_state="collapsed"
     )
 
     # Initialize session state
