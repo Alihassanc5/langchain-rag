@@ -34,7 +34,6 @@ def main():
     if st.session_state.rag_app is None:
         with st.spinner("Loading..."):
             st.session_state.rag_app = initialize_rag_app()
-            # st.session_state.rag_app.load_documents("food.docx")
 
     # Render the main chat interface
     render_chat_interface()
