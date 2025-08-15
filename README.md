@@ -1,84 +1,98 @@
-# LangChain RAG with Pinecone
+# Cogent Labs Policies Assistant
 
-A Retrieval-Augmented Generation (RAG) application built with LangChain and Pinecone for document-based question answering.
+A RAG (Retrieval-Augmented Generation) application for document-based question answering using LangChain, Pinecone, and Google's Gemini models.
+
+## Project Structure
+
+The application has been modularized into the following components:
+
+```
+langchain-rag/
+├── main.py              # Main application entry point
+├── config.py            # Configuration and environment variables
+├── models.py            # Data models and type definitions
+├── rag_app.py           # Core RAG application logic
+├── auth.py              # Authentication functionality
+├── ui_components.py     # Streamlit UI components
+├── requirements.txt     # Python dependencies
+└── README.md           # This file
+```
+
+### Module Descriptions
+
+- **`main.py`**: Entry point that orchestrates the application, handles page configuration, and initializes components
+- **`config.py`**: Centralized configuration management for environment variables and default settings
+- **`models.py`**: Type definitions and data structures used throughout the application
+- **`rag_app.py`**: Core RAG functionality including document processing, vector storage, and query handling
+- **`auth.py`**: User authentication logic for admin access to document management features
+- **`ui_components.py`**: Streamlit UI components for chat interface and document management
 
 ## Features
 
-- Document upload and processing (DOCX, PDF, TXT)
-- Vector storage using Pinecone
-- Chat interface for querying documents
-- Admin authentication for document management
-- Conversation history support
+- **Document Upload**: Upload and process Word documents (.docx) to the knowledge base
+- **RAG-powered Q&A**: Ask questions about uploaded documents with context-aware responses
+- **Streaming Responses**: Real-time streaming of AI responses for better user experience
+- **Document Management**: View, manage, and clear documents from the vector store
+- **Admin Authentication**: Secure access to document management features
+- **Conversation History**: Maintains context across multiple questions
 
 ## Setup
 
-### 1. Install Dependencies
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```bash
-pip install -r requirements.txt
-```
+2. **Environment Variables**: Create a `.env` file with:
+   ```
+   PINECONE_API_KEY=your_pinecone_api_key
+   PINECONE_ENVIRONMENT=your_pinecone_environment
+   PINECONE_INDEX_NAME=your_index_name
+   ADMIN_PASSWORD=your_admin_password
+   GOOGLE_API_KEY=your_google_api_key
+   ```
 
-### 2. Environment Configuration
-
-Create a `.env` file in the root directory with the following variables:
-
-```env
-# Pinecone Configuration
-PINECONE_API_KEY=your_pinecone_api_key_here
-PINECONE_ENVIRONMENT=your_pinecone_environment_here
-PINECONE_INDEX_NAME=policies
-
-# Google AI Configuration
-GOOGLE_API_KEY=your_google_api_key_here
-```
-
-### 3. Pinecone Setup
-
-1. Sign up for a Pinecone account at [pinecone.io](https://pinecone.io)
-2. Create a new project and get your API key
-3. Note your environment (e.g., `us-east-1-aws`)
-4. Add these credentials to your `.env` file
-
-### 4. Google AI Setup
-
-1. Get a Google AI API key from [Google AI Studio](https://aistudio.google.com/)
-2. Add the API key to your `.env` file
+3. **Run the Application**:
+   ```bash
+   streamlit run main.py
+   ```
 
 ## Usage
 
-### Running the Application
+1. **Access the Application**: Open your browser to the Streamlit URL (usually `http://localhost:8501`)
 
-```bash
-streamlit run main.py
-```
+2. **Admin Authentication**: Click the sidebar and enter the admin password to access document management
 
-### Default Admin Credentials
+3. **Upload Documents**: Use the sidebar to upload Word documents (.docx) to the knowledge base
 
-- Username: admin
-- Password: admin123
+4. **Ask Questions**: Use the chat interface to ask questions about the uploaded documents
 
-**Important**: Change these credentials in production!
+5. **Manage Documents**: View document statistics and clear the knowledge base as needed
 
-### Features
+## Technical Details
 
-- **Document Upload**: Upload documents through the admin interface
-- **Chat Interface**: Ask questions about your uploaded documents
-- **Vector Management**: View and manage your Pinecone index
-- **Conversation History**: Maintain context across multiple questions
-
-## Architecture
-
-- **Vector Store**: Pinecone for scalable vector storage
-- **Embeddings**: Google Gemini embeddings
-- **LLM**: Google Gemini 2.5 Flash for text generation
-- **Framework**: LangChain with LangGraph for workflow management
+- **Vector Store**: Pinecone for document storage and similarity search
+- **Embeddings**: Google's Gemini embedding model
+- **Language Model**: Google's Gemini 2.5 Flash for text generation
+- **Framework**: LangChain for RAG pipeline orchestration
 - **UI**: Streamlit for the web interface
+- **Document Processing**: LangChain document loaders and text splitters
 
-## Notes
+## Configuration
 
-- The application automatically creates a Pinecone index named "policies" if it doesn't exist
-- Document chunks are stored as vectors in Pinecone
-- The system uses cosine similarity for vector search
-- All vectors are stored in the cloud via Pinecone's managed service
-- The index is configured for 768-dimensional vectors (compatible with Gemini embedding-001)
-- If you encounter dimension mismatch errors, delete the existing index and let the app recreate it
+Key configuration options can be modified in `config.py`:
+
+- `DEFAULT_CHUNK_SIZE`: Size of text chunks for document splitting (default: 1500)
+- `DEFAULT_CHUNK_OVERLAP`: Overlap between text chunks (default: 100)
+- `DEFAULT_K_RETRIEVAL`: Number of documents to retrieve per query (default: 3)
+- `DEFAULT_TEMPERATURE`: LLM temperature for response generation (default: 0.0)
+
+## Security
+
+- Admin password is hashed using SHA-256
+- Authentication state is managed through Streamlit session state
+- Secure password comparison using `hmac.compare_digest`
+
+## Dependencies
+
+See `requirements.txt` for the complete list of Python packages required to run this application.
