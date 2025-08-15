@@ -1,12 +1,14 @@
 import streamlit as st
 import hashlib
 import hmac
+import os
 
 from typing import List, Dict, Any
 from langchain_community.document_loaders import UnstructuredWordDocumentLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_chroma import Chroma
+from pinecone import Pinecone
+from langchain_pinecone import PineconeVectorStore
 from langchain_core.documents import Document
 from langchain.chat_models import init_chat_model
 from langgraph.graph import START, StateGraph
@@ -29,8 +31,6 @@ class RAGApp:
     """
     
     def __init__(self, 
-                 collection_name: str = "policies",
-                 persist_directory: str = "./chroma_langchain_db",
                  chunk_size: int = 1000,
                  chunk_overlap: int = 200,
                  embedding_model: str = "models/gemini-embedding-001",
@@ -41,8 +41,6 @@ class RAGApp:
         Initialize the RAG application.
         
         Args:
-            collection_name: Name for the vector store collection
-            persist_directory: Directory to persist the vector store
             chunk_size: Size of text chunks for splitting documents
             chunk_overlap: Overlap between text chunks
             embedding_model: Model name for embeddings
@@ -50,11 +48,11 @@ class RAGApp:
             temperature: Temperature for the language model
             k_retrieval: Number of documents to retrieve for each query
         """
-        self.collection_name = collection_name
-        self.persist_directory = persist_directory
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.k_retrieval = k_retrieval
+        self.index_name = os.getenv("PINECONE_INDEX_NAME")
+        self.pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"), environment=os.getenv("PINECONE_ENVIRONMENT"))
         
         # Initialize components
         self._setup_embeddings(embedding_model)
@@ -69,10 +67,12 @@ class RAGApp:
     
     def _setup_vector_store(self):
         """Initialize the vector store."""
-        self.vector_store = Chroma(
-            collection_name=self.collection_name,
-            embedding_function=self.embeddings,
-            persist_directory=self.persist_directory,
+        # Initialize Pinecone
+        index = self.pc.Index(self.index_name)
+
+        self.vector_store = PineconeVectorStore(
+            index=index,
+            embedding=self.embeddings,
         )
     
     def _setup_llm(self, llm_model: str, temperature: float):
@@ -177,44 +177,46 @@ class RAGApp:
             raise Exception(f"Error processing query: {e}")
     
     def get_collection_info(self) -> Dict[str, Any]:
-        """Get information about the vector store collection."""
-        collection = self.vector_store._collection
-        if collection:
+        """Get information about the Pinecone index."""
+        try:
+            index = self.pc.Index(self.index_name)
+            stats = index.describe_index_stats()
             return {
-                "name": collection.name,
-                "count": collection.count(),
-                "metadata": collection.metadata
+                "name": self.index_name,
+                "count": stats.get("total_vector_count", 0),
+                "dimension": stats.get("dimension", 0),
+                "metric": stats.get("metric", "cosine")
             }
-        return {"error": "Collection not found"}
+        except Exception as e:
+            return {"error": f"Index not found: {str(e)}"}
     
     def get_documents_list(self) -> List[Dict[str, Any]]:
-        """Get a list of documents in the collection with their metadata."""
+        """Get a list of documents in the Pinecone index with their metadata."""
         try:
-            collection = self.vector_store._collection
-            if collection:
-                # Get all documents from the collection
-                results = collection.get()
-                documents = []
-                
-                if results and results['documents']:
-                    for i, doc in enumerate(results['documents']):
-                        metadata = results['metadatas'][i] if results['metadatas'] else {}
-                        documents.append({
-                            "content": doc[:100] + "..." if len(doc) > 100 else doc,
-                            "metadata": metadata,
-                            "id": results['ids'][i] if results['ids'] else f"doc_{i}"
-                        })
-                
-                return documents
-            return []
+            index = self.pc.Index(self.index_name)
+            stats = index.describe_index_stats()
+            
+            # Note: Pinecone doesn't provide a direct way to list all documents
+            # This is a limitation of Pinecone's API
+            documents = []
+            if stats.get("total_vector_count", 0) > 0:
+                documents.append({
+                    "content": f"Index contains {stats.get('total_vector_count', 0)} vectors",
+                    "metadata": {"note": "Pinecone doesn't provide direct document listing"},
+                    "id": "pinecone_index"
+                })
+            
+            return documents
         except Exception as e:
             return []
     
     def clear_documents(self) -> str:
-        """Clear all documents from the vector store."""
+        """Clear all documents from the Pinecone index."""
         try:
-            self.vector_store.delete_collection()
-            return "All documents cleared from the vector store."
+            index = self.pc.Index(self.index_name)
+            # Delete all vectors in the index
+            index.delete(delete_all=True)
+            return "All documents cleared from the Pinecone index."
         except Exception as e:
             raise Exception(f"Error clearing documents: {e}")
 
@@ -347,8 +349,8 @@ def main():
                 try:
                     collection_info = st.session_state.rag_app.get_collection_info()
                     if "error" not in collection_info:
-                        st.info(f"📊 Collection: {collection_info['name']}")
-                        st.info(f"📄 Documents: {collection_info['count']} chunks")
+                        st.info(f"📊 Index: {collection_info['name']}")
+                        st.info(f"📄 Vectors: {collection_info['count']} total")
                         
                         # Show documents list if there are documents
                         if collection_info['count'] > 0:
@@ -370,7 +372,7 @@ def main():
                     st.warning(f"Could not retrieve collection info: {str(e)}")
             
             # Clear documents button
-            if st.button("🗑️ Clear All Documents", type="secondary"):
+            if st.button("🗑️ Clear All Vectors", type="secondary"):
                 if st.session_state.rag_app:
                     with st.spinner("Clearing documents..."):
                         try:
@@ -407,8 +409,6 @@ def main():
                 asyncio.set_event_loop(loop)
             
             rag_app = RAGApp(
-                collection_name="policies",
-                persist_directory="./chroma_langchain_db",
                 chunk_size=1500,
                 chunk_overlap=100,
                 temperature=0.0,
