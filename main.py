@@ -155,6 +155,22 @@ class RAGApp:
         response = self.model.invoke(messages)
         return {"answer": response.content}
     
+    def _generate_stream(self, state: State):
+        """Generate streaming answer based on retrieved context."""
+        docs_content = "\n\n".join([doc.page_content for doc in state["context"]])
+        
+        # Get conversation history from state if available
+        conversation_history = state.get("conversation_history", "")
+        
+        messages = self.prompt.invoke({
+            "question": state["question"], 
+            "context": docs_content,
+            "conversation_history": conversation_history
+        })
+        
+        # Return streaming response
+        return self.model.stream(messages)
+    
     def query(self, question: str, conversation_history: str = "") -> str:
         """
         Query the RAG system with a question.
@@ -175,6 +191,31 @@ class RAGApp:
             return result["answer"]
         except Exception as e:
             raise Exception(f"Error processing query: {e}")
+    
+    def query_stream(self, question: str, conversation_history: str = ""):
+        """
+        Query the RAG system with streaming response.
+        
+        Args:
+            question: The question to ask
+            conversation_history: Previous conversation messages
+            
+        Yields:
+            Streaming chunks of the generated answer
+        """
+        try:
+            # First retrieve relevant documents
+            retrieved_docs = self.vector_store.similarity_search(
+                question, 
+                k=self.k_retrieval
+            )
+            
+            # Then generate streaming response
+            for chunk in self._generate_stream({"question": question, "context": retrieved_docs, "conversation_history": conversation_history}):
+                if hasattr(chunk, 'content') and chunk.content:
+                    yield chunk.content
+        except Exception as e:
+            yield f"Error processing query: {e}"
     
     def get_collection_info(self) -> Dict[str, Any]:
         """Get information about the Pinecone index."""
@@ -444,24 +485,37 @@ def main():
             message_placeholder = st.empty()
 
             try:
+                # Get last 5 messages for conversation history
+                conversation_history = ""
+                if len(st.session_state.messages) > 1:  # More than just the current user message
+                    # Get last 5 messages (excluding the current one)
+                    recent_messages = st.session_state.messages[-6:-1]  # Last 5 before current
+                    conversation_history = "\n".join([
+                        f"{msg['role'].title()}: {msg['content']}" 
+                        for msg in recent_messages
+                    ])
+                
+                # Initialize full response for chat history
+                full_response = ""
+                first_chunk_received = False
+                
+                # Show thinking spinner initially
                 with st.spinner("Thinking..."):
-                    # Get last 5 messages for conversation history
-                    conversation_history = ""
-                    if len(st.session_state.messages) > 1:  # More than just the current user message
-                        # Get last 5 messages (excluding the current one)
-                        recent_messages = st.session_state.messages[-6:-1]  # Last 5 before current
-                        conversation_history = "\n".join([
-                            f"{msg['role'].title()}: {msg['content']}" 
-                            for msg in recent_messages
-                        ])
-                    
-                    # Run the query synchronously with conversation history
-                    answer = st.session_state.rag_app.query(prompt, conversation_history)
-                    
-                    message_placeholder.markdown(answer)
-                    
-                    # Add assistant response to chat history
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                    # Stream the response
+                    for chunk in st.session_state.rag_app.query_stream(prompt, conversation_history):
+                        if not first_chunk_received:
+                            # First chunk received, clear spinner and start streaming
+                            first_chunk_received = True
+                            st.empty()  # Clear the spinner
+                        
+                        full_response += chunk
+                        message_placeholder.markdown(full_response + "▌")
+                
+                # Display final response without cursor
+                message_placeholder.markdown(full_response)
+                
+                # Add assistant response to chat history
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
                     
             except Exception as e:
                 error_message = f"Error processing your question: {str(e)}"
